@@ -5,6 +5,7 @@ import { MongoClient } from "mongodb";
 import joi from "joi";
 import bcrypt from "bcrypt";
 import { v4 as uuid } from "uuid";
+import dayjs from "dayjs";
 
 const signUpSchema = joi.object({
   name: joi.string().min(3).required(),
@@ -25,6 +26,11 @@ const signInSchema = joi.object({
   password: joi.string().required(),
 });
 
+const statementsSchema = joi.object({
+  value: joi.number().required(),
+  description: joi.string().required(),
+});
+
 const app = express();
 
 app.use(cors());
@@ -43,6 +49,7 @@ try {
 const db = mongoClient.db("projeto14-mywallet-back");
 const collectionUsers = db.collection("users");
 const collectionSessions = db.collection("sessions");
+const collectionStatements = db.collection("statements");
 
 app.post("/sign-up", async (req, res) => {
   const { name, email, password } = req.body;
@@ -61,6 +68,7 @@ app.post("/sign-up", async (req, res) => {
       res.status(422).send(errors);
       return;
     }
+
     const emailInUse = await collectionUsers.findOne({
       email,
     });
@@ -114,6 +122,54 @@ app.post("/sign-in", async (req, res) => {
     });
 
     res.send({ token });
+  } catch (err) {
+    console.log(err);
+    res.sendStatus(500);
+  }
+});
+
+app.post("/statements", async (req, res) => {
+  const { value, description } = req.body;
+  const { authorization } = req.headers;
+  const day = dayjs().format("DD/MM");
+
+  const token = authorization?.replace("Bearer ", "");
+
+  if (!token) {
+    res.sendStatus(401);
+    return;
+  }
+
+  try {
+    const { error } = statementsSchema.validate(req.body, {
+      abortEarly: false,
+    });
+
+    if (error) {
+      const errors = error.details.map((d) => d.message);
+      res.status(422).send(errors);
+      return;
+    }
+
+    const session = await collectionSessions.findOne({
+      token,
+    });
+
+    if (!session) {
+      res.sendStatus(401);
+      return;
+    }
+
+    const statement = {
+      value: Number(value),
+      description,
+      day,
+      userId: session.userId,
+    };
+
+    await collectionStatements.insertOne(statement);
+
+    res.sendStatus(201);
   } catch (err) {
     console.log(err);
     res.sendStatus(500);
