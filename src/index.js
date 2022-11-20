@@ -176,6 +176,38 @@ app.post("/statements", async (req, res) => {
   }
 });
 
+app.get("/statements", async (req, res) => {
+  const { authorization } = req.headers;
+
+  const token = authorization?.replace("Bearer ", "");
+
+  if (!token) {
+    res.sendStatus(401);
+    return;
+  }
+
+  try {
+    const session = await collectionSessions.findOne({ token });
+
+    if (!session) {
+      res.sendStatus(401);
+      return;
+    }
+
+    const user = await collectionUsers.findOne({ _id: session.userId });
+    const statements = await collectionStatements
+      .find({ userId: session.userId })
+      .toArray();
+
+      delete user.password;
+
+    res.send({ user, statements });
+  } catch (err) {
+    console.log(err);
+    res.sendStatus(500);
+  }
+});
+
 app.listen(process.env.PORT, () =>
   console.log(`Server running in port: ${process.env.PORT}`)
 );
