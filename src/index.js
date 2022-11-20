@@ -14,10 +14,15 @@ const signUpSchema = joi.object({
     .string()
     .equal(joi.ref("password"))
     .required()
-    .label("Confirm password")
+    .label("Password confirmation")
     .options({
       messages: { "any.only": "{{#label}} does not match with password" },
     }),
+});
+
+const signInSchema = joi.object({
+  email: joi.string().email().required(),
+  password: joi.string().required(),
 });
 
 const app = express();
@@ -37,8 +42,9 @@ try {
 
 const db = mongoClient.db("projeto14-mywallet-back");
 const collectionUsers = db.collection("users");
+const collectionSessions = db.collection("sessions");
 
-app.post("/signup", async (req, res) => {
+app.post("/sign-up", async (req, res) => {
   const { name, email, password } = req.body;
   const passwordHash = bcrypt.hashSync(password, 10);
   const user = {
@@ -69,6 +75,45 @@ app.post("/signup", async (req, res) => {
     await collectionUsers.insertOne(user);
 
     res.sendStatus(201);
+  } catch (err) {
+    console.log(err);
+    res.sendStatus(500);
+  }
+});
+
+app.post("/sign-in", async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const { error } = signInSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      const errors = error.details.map((d) => d.message);
+      res.status(422).send(errors);
+      return;
+    }
+
+    const user = await collectionUsers.findOne({ email });
+
+    if (!user) {
+      res.status(401).send({ message: "Email address is incorrect" });
+      return;
+    }
+
+    const correctPassword = bcrypt.compareSync(password, user.password);
+
+    if (!correctPassword) {
+      res.status(401).send({ message: "Password incorrect" });
+      return;
+    }
+
+    const token = uuid();
+
+    await collectionSessions.insertOne({
+      token,
+      userId: user._id,
+    });
+
+    res.send({ token });
   } catch (err) {
     console.log(err);
     res.sendStatus(500);
