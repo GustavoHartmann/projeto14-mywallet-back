@@ -16,7 +16,6 @@ export async function signIn(req, res) {
 
     res.send({ token });
   } catch (err) {
-    console.log(err);
     res.sendStatus(500);
   }
 }

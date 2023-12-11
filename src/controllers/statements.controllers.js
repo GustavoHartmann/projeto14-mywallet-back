@@ -26,7 +26,6 @@ export async function postStatement(req, res) {
 
     res.sendStatus(201);
   } catch (err) {
-    console.log(err);
     res.sendStatus(500);
   }
 }
@@ -45,7 +44,6 @@ export async function getStatements(req, res) {
 
     res.send({ user, statements });
   } catch (err) {
-    console.log(err);
     res.sendStatus(500);
   }
 }
